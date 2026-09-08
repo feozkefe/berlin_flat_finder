@@ -86,6 +86,17 @@ def known_ids() -> set[str]:
     return {row["id"] for row in rows}
 
 
+def clear_listings() -> int:
+    """Forget seen ads. Filters stay. Next /scan treats everything as new."""
+    with _lock, _connect() as conn:
+        row = conn.execute("SELECT COUNT(*) AS n FROM listings").fetchone()
+        count = int(row["n"]) if row else 0
+        conn.execute("DELETE FROM listings")
+        conn.execute("DELETE FROM scans")
+        conn.commit()
+    return count
+
+
 def listing_count() -> int:
     with _lock, _connect() as conn:
         row = conn.execute("SELECT COUNT(*) AS n FROM listings").fetchone()

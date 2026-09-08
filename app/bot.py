@@ -17,7 +17,7 @@ from app import db
 from app.config import settings
 from app.districts import DISTRICTS
 from app.models import Filters, Listing
-from app.notify import format_listing, send_scan_result
+from app.notify import send_listing_batches, send_scan_result
 from app.scanner import run_scan
 
 logger = logging.getLogger(__name__)
@@ -76,7 +76,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Filtreleri buradan kur: /setup\n"
         "Durum: /status\n"
         "Hemen tara: /scan\n"
-        "Durdur / aç: /pause /resume\n\n"
+        "Durdur / aç: /pause /resume\n"
+        "Kayıtlı ilanları sil: /reset\n\n"
         f"Chat bağlandı. Şu an {filters.interval_hours} saatte bir tarama."
     )
 
@@ -258,12 +259,21 @@ async def resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def latest(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    rows = db.recent_listings(15)
+    rows = db.recent_listings(200)
     if not rows:
         await update.message.reply_text("Henüz kayıtlı ilan yok. /scan")
         return
-    for row in rows:
-        await update.message.reply_text(format_listing(Listing.from_dict(row)))
+    await update.message.reply_text(f"{len(rows)} kayıtlı ilan:")
+    listings = [Listing.from_dict(row) for row in rows]
+    await send_listing_batches(context.bot, str(update.effective_chat.id), listings)
+
+
+async def reset_listings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    count = db.clear_listings()
+    await update.message.reply_text(
+        f"{count} kayıtlı ilan silindi. Filtre duruyor.\n"
+        "Hepsini linkleriyle görmek için /scan"
+    )
 
 
 def build_application() -> Application | None:
@@ -294,4 +304,5 @@ def build_application() -> Application | None:
     application.add_handler(CommandHandler("pause", pause))
     application.add_handler(CommandHandler("resume", resume))
     application.add_handler(CommandHandler("latest", latest))
+    application.add_handler(CommandHandler("reset", reset_listings))
     return application
