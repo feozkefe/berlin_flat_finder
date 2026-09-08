@@ -39,6 +39,8 @@ def init_db() -> None:
                 district TEXT,
                 image_url TEXT,
                 available_from TEXT,
+                available_to TEXT,
+                duration_months INTEGER,
                 is_sublet INTEGER,
                 contactable INTEGER,
                 alt_urls TEXT,
@@ -57,6 +59,11 @@ def init_db() -> None:
             );
             """
         )
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(listings)")}
+        if "available_to" not in cols:
+            conn.execute("ALTER TABLE listings ADD COLUMN available_to TEXT")
+        if "duration_months" not in cols:
+            conn.execute("ALTER TABLE listings ADD COLUMN duration_months INTEGER")
         conn.commit()
 
 
@@ -111,9 +118,9 @@ def upsert_listings(listings: list[Listing], *, mark_notified: bool) -> None:
                 """
                 INSERT INTO listings (
                     id, provider, title, url, price, rooms, size_sqm, address,
-                    district, image_url, available_from, is_sublet, contactable,
-                    alt_urls, first_seen, last_seen, notified
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    district, image_url, available_from, available_to, duration_months,
+                    is_sublet, contactable, alt_urls, first_seen, last_seen, notified
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     title = excluded.title,
                     url = excluded.url,
@@ -124,6 +131,8 @@ def upsert_listings(listings: list[Listing], *, mark_notified: bool) -> None:
                     district = excluded.district,
                     image_url = excluded.image_url,
                     available_from = excluded.available_from,
+                    available_to = excluded.available_to,
+                    duration_months = excluded.duration_months,
                     is_sublet = excluded.is_sublet,
                     contactable = excluded.contactable,
                     alt_urls = excluded.alt_urls,
@@ -141,6 +150,8 @@ def upsert_listings(listings: list[Listing], *, mark_notified: bool) -> None:
                     listing.district,
                     listing.image_url,
                     listing.available_from,
+                    listing.available_to,
+                    listing.duration_months,
                     int(listing.is_sublet),
                     int(listing.contactable),
                     json.dumps(listing.alt_urls, ensure_ascii=False),
@@ -209,6 +220,8 @@ def _row_to_listing_dict(row: sqlite3.Row) -> dict[str, Any]:
         "district": row["district"],
         "image_url": row["image_url"],
         "available_from": row["available_from"],
+        "available_to": row["available_to"] if "available_to" in row.keys() else None,
+        "duration_months": row["duration_months"] if "duration_months" in row.keys() else None,
         "is_sublet": bool(row["is_sublet"]),
         "contactable": bool(row["contactable"]),
         "alt_urls": json.loads(row["alt_urls"] or "[]"),

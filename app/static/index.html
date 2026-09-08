@@ -34,6 +34,18 @@
         </label>
       </div>
 
+      <div class="grid">
+        <label>Başlangıç (boş = fark etmez)
+          <input id="start_from" type="date" />
+        </label>
+        <label>En az ay (0 = fark etmez)
+          <input id="min_months" type="number" min="0" max="36" step="1" />
+        </label>
+        <label>En fazla ay (0 = fark etmez)
+          <input id="max_months" type="number" min="0" max="36" step="1" />
+        </label>
+      </div>
+
       <label>Tip</label>
       <div class="chips">
         <button type="button" class="chip type" data-type="wg">WG odası</button>

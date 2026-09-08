@@ -60,6 +60,8 @@ def format_listing_compact(listing: Listing, index: int) -> str:
         f"{listing.price:,.0f}€".replace(",", ".") if listing.price else None,
         listing.district or None,
         f"{listing.rooms:g} Zi" if listing.rooms else None,
+        f"ab {listing.available_from}" if listing.available_from else None,
+        f"{listing.duration_months} ay" if listing.duration_months else None,
     ]
     meta = " · ".join(bit for bit in bits if bit)
     extra = ""

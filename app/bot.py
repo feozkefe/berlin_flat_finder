@@ -15,6 +15,7 @@ from telegram.ext import (
 
 from app import db
 from app.config import settings
+from app.dates import parse_user_months, parse_user_start
 from app.districts import DISTRICTS
 from app.models import Filters, Listing
 from app.notify import send_listing_batches, send_scan_result
@@ -22,7 +23,7 @@ from app.scanner import run_scan
 
 logger = logging.getLogger(__name__)
 
-DISTRICT_PICK, RENT_PICK, ROOMS_PICK, TYPE_PICK, INTERVAL_PICK = range(5)
+DISTRICT_PICK, RENT_PICK, ROOMS_PICK, DATE_PICK, MONTHS_PICK, TYPE_PICK, INTERVAL_PICK = range(7)
 
 
 def _district_keyboard(selected: list[str]) -> InlineKeyboardMarkup:
@@ -62,6 +63,16 @@ def _interval_keyboard(current: int) -> InlineKeyboardMarkup:
             ]
         ]
     )
+
+
+def _months_label(filters: Filters) -> str:
+    if not filters.min_months and not filters.max_months:
+        return "fark etmez"
+    if filters.min_months and filters.max_months:
+        return f"{filters.min_months}-{filters.max_months} ay"
+    if filters.min_months:
+        return f"en az {filters.min_months} ay"
+    return f"en fazla {filters.max_months} ay"
 
 
 def _bind_chat(filters: Filters, chat_id: int | str) -> Filters:
@@ -149,6 +160,33 @@ async def rooms_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         await update.message.reply_text("1 ile 8 arası bir sayı yaz.")
         return ROOMS_PICK
     context.user_data["filters"]["min_rooms"] = rooms
+    await update.message.reply_text(
+        "Ne zamandan itibaren? örn. 01.10.2026\n"
+        "0 = fark etmez / hemen"
+    )
+    return DATE_PICK
+
+
+async def date_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    parsed = parse_user_start(update.message.text or "")
+    if parsed == "invalid":
+        await update.message.reply_text("Tarih 01.10.2026 veya 0 olsun.")
+        return DATE_PICK
+    context.user_data["filters"]["start_from"] = parsed
+    await update.message.reply_text(
+        "Kaç aylık? En az ay, veya aralık.\n"
+        "örn. 6  |  6-12  |  0 = fark etmez"
+    )
+    return MONTHS_PICK
+
+
+async def months_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    parsed = parse_user_months(update.message.text or "")
+    if parsed is None:
+        await update.message.reply_text("6 veya 6-12 veya 0 yaz.")
+        return MONTHS_PICK
+    context.user_data["filters"]["min_months"] = parsed[0]
+    context.user_data["filters"]["max_months"] = parsed[1]
     types = context.user_data["filters"].get("listing_types") or ["wg", "apartment", "sublet"]
     await update.message.reply_text(
         "Ne arıyorsun? İstediğini işaretle, sonra Devam.",
@@ -198,6 +236,8 @@ async def interval_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         f"Mahalle: {names}\n"
         f"Max kira: {filters.max_rent} €\n"
         f"Min oda: {filters.min_rooms:g}\n"
+        f"Başlangıç: {filters.start_from or 'fark etmez'}\n"
+        f"Süre: {_months_label(filters)}\n"
         f"Tipler: {', '.join(filters.listing_types)}\n"
         f"Aralık: {filters.interval_hours} saat\n\n"
         "Hemen denemek için /scan"
@@ -226,6 +266,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"{'Açık' if filters.enabled else 'Duraklatıldı'}\n"
         f"Mahalle: {names}\n"
         f"Max kira: {filters.max_rent} € · min {filters.min_rooms:g} oda · {filters.min_sqm} m²\n"
+        f"Başlangıç: {filters.start_from or 'fark etmez'} · süre: {_months_label(filters)}\n"
         f"Tip: {', '.join(filters.listing_types)}\n"
         f"Kaynak: {', '.join(filters.sources)}\n"
         f"Aralık: {filters.interval_hours} saat\n"
@@ -288,6 +329,8 @@ def build_application() -> Application | None:
             DISTRICT_PICK: [CallbackQueryHandler(district_pick, pattern=r"^d:")],
             RENT_PICK: [MessageHandler(filters.TEXT & ~filters.COMMAND, rent_pick)],
             ROOMS_PICK: [MessageHandler(filters.TEXT & ~filters.COMMAND, rooms_pick)],
+            DATE_PICK: [MessageHandler(filters.TEXT & ~filters.COMMAND, date_pick)],
+            MONTHS_PICK: [MessageHandler(filters.TEXT & ~filters.COMMAND, months_pick)],
             TYPE_PICK: [CallbackQueryHandler(type_pick, pattern=r"^t:")],
             INTERVAL_PICK: [CallbackQueryHandler(interval_pick, pattern=r"^i:")],
         },

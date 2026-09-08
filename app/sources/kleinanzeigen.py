@@ -6,6 +6,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from app.config import settings
+from app.dates import fill_timing
 from app.districts import detect_district
 from app.matching import looks_like_sublet, looks_like_wanted_ad
 from app.models import Filters, Listing
@@ -108,19 +109,22 @@ class KleinanzeigenSource(BaseSource):
             if image_el:
                 image = image_el.get("src") or image_el.get("data-src")
             listings.append(
-                Listing(
-                    id=f"ka_{ad_id}",
-                    provider="kleinanzeigen",
-                    title=title,
-                    url=url,
-                    price=price,
-                    rooms=rooms,
-                    size_sqm=size,
-                    address=re.sub(r"\s+", " ", address)[:220],
-                    district=district.name if district else "",
-                    image_url=image if image and image.startswith("http") else None,
-                    is_sublet=looks_like_sublet(f"{title} {text}"),
-                    contactable=True,
+                fill_timing(
+                    Listing(
+                        id=f"ka_{ad_id}",
+                        provider="kleinanzeigen",
+                        title=title,
+                        url=url,
+                        price=price,
+                        rooms=rooms,
+                        size_sqm=size,
+                        address=re.sub(r"\s+", " ", address)[:220],
+                        district=district.name if district else "",
+                        image_url=image if image and image.startswith("http") else None,
+                        is_sublet=looks_like_sublet(f"{title} {text}"),
+                        contactable=True,
+                    ),
+                    extra_text=text,
                 )
             )
         return listings

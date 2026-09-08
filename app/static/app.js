@@ -45,6 +45,9 @@ function fillForm(settings) {
   $("max_rent").value = settings.max_rent;
   $("min_rooms").value = settings.min_rooms;
   $("min_sqm").value = settings.min_sqm;
+  $("start_from").value = settings.start_from || "";
+  $("min_months").value = settings.min_months ?? 0;
+  $("max_months").value = settings.max_months ?? 0;
   $("telegram_chat_id").value = settings.telegram_chat_id || "";
   paintChips(".district", state.districts, "id");
   paintChips(".type", state.listing_types, "type");
@@ -60,6 +63,9 @@ function collect() {
     max_rent: Number($("max_rent").value),
     min_rooms: Number($("min_rooms").value),
     min_sqm: Number($("min_sqm").value),
+    start_from: $("start_from").value || "",
+    min_months: Number($("min_months").value) || 0,
+    max_months: Number($("max_months").value) || 0,
     listing_types: state.listing_types,
     sources: state.sources,
     interval_hours: state.interval_hours,
@@ -94,7 +100,7 @@ function renderListings(payload) {
       : `<span class="badge ok">yazılabilir</span>`;
     el.innerHTML = `
       <h3><a href="${item.url}" target="_blank" rel="noreferrer">${item.title}</a></h3>
-      <p>${[item.district || "Berlin", item.rooms ? item.rooms + " Zi" : "", item.size_sqm ? item.size_sqm + " m²" : "", item.price ? item.price + " €" : ""].filter(Boolean).join(" · ")}</p>
+      <p>${[item.district || "Berlin", item.rooms ? item.rooms + " Zi" : "", item.size_sqm ? item.size_sqm + " m²" : "", item.price ? item.price + " €" : "", item.available_from ? "ab " + item.available_from : "", item.duration_months ? item.duration_months + " ay" : ""].filter(Boolean).join(" · ")}</p>
       <p>${item.address || ""}</p>
       <div class="badges">
         <span class="badge">${providerLabel(item.provider)}</span>

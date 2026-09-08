@@ -7,6 +7,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from app.config import settings
+from app.dates import fill_timing
 from app.districts import detect_district
 from app.matching import looks_like_sublet
 from app.models import Filters, Listing
@@ -106,6 +107,9 @@ class WgGesuchtSource(BaseSource):
         available = data.get("available_from_date") or ""
         if available == "00.00.0000":
             available = ""
+        available_to = data.get("available_to_date") or ""
+        if available_to == "00.00.0000":
+            available_to = ""
 
         category = str(data.get("category", "0"))
         slug = CATEGORY_SLUGS.get(category, "wg-zimmer")
@@ -115,20 +119,24 @@ class WgGesuchtSource(BaseSource):
         district = detect_district(blob)
         image = _image_for_id(search_html, offer_id)
 
-        return Listing(
-            id=f"wg_{offer_id}",
-            provider="wg_gesucht",
-            title=title,
-            url=url,
-            price=price,
-            rooms=rooms if category != "0" else rooms or 1,
-            size_sqm=size,
-            address=address,
-            district=district.name if district else district_name,
-            image_url=image,
-            available_from=available or None,
-            is_sublet=looks_like_sublet(blob) or str(data.get("rent_type", "")) in {"1", "2"},
-            contactable=True,
+        return fill_timing(
+            Listing(
+                id=f"wg_{offer_id}",
+                provider="wg_gesucht",
+                title=title,
+                url=url,
+                price=price,
+                rooms=rooms if category != "0" else rooms or 1,
+                size_sqm=size,
+                address=address,
+                district=district.name if district else district_name,
+                image_url=image,
+                available_from=available or None,
+                available_to=available_to or None,
+                is_sublet=looks_like_sublet(blob) or str(data.get("rent_type", "")) in {"1", "2"},
+                contactable=True,
+            ),
+            extra_text=blob,
         )
 
     def _from_html_block(self, offer_id: str, search_html: str) -> Listing | None:
@@ -146,16 +154,19 @@ class WgGesuchtSource(BaseSource):
         if not href.startswith("http"):
             href = BASE + href
         district = detect_district(text)
-        return Listing(
-            id=f"wg_{offer_id}",
-            provider="wg_gesucht",
-            title=title,
-            url=href,
-            price=_first_euro(text),
-            address=text[:180],
-            district=district.name if district else "",
-            is_sublet=looks_like_sublet(text),
-            contactable=True,
+        return fill_timing(
+            Listing(
+                id=f"wg_{offer_id}",
+                provider="wg_gesucht",
+                title=title,
+                url=href,
+                price=_first_euro(text),
+                address=text[:180],
+                district=district.name if district else "",
+                is_sublet=looks_like_sublet(text),
+                contactable=True,
+            ),
+            extra_text=text,
         )
 
 

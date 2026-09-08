@@ -6,6 +6,7 @@ import re
 import httpx
 
 from app.config import settings
+from app.dates import fill_timing
 from app.districts import DISTRICT_BY_ID, detect_district
 from app.matching import looks_like_sublet
 from app.models import Filters, Listing
@@ -91,19 +92,22 @@ class ImmoScoutSource(BaseSource):
         blob = f"{title} {address}"
         district = detect_district(blob)
 
-        return Listing(
-            id=f"is24_{listing_id}",
-            provider="immoscout",
-            title=title,
-            url=f"https://www.immobilienscout24.de/expose/{listing_id}",
-            price=price,
-            rooms=rooms,
-            size_sqm=size,
-            address=address,
-            district=district.name if district else "",
-            image_url=image,
-            is_sublet=looks_like_sublet(blob),
-            contactable=False,
+        return fill_timing(
+            Listing(
+                id=f"is24_{listing_id}",
+                provider="immoscout",
+                title=title,
+                url=f"https://www.immobilienscout24.de/expose/{listing_id}",
+                price=price,
+                rooms=rooms,
+                size_sqm=size,
+                address=address,
+                district=district.name if district else "",
+                image_url=image,
+                is_sublet=looks_like_sublet(blob),
+                contactable=False,
+            ),
+            extra_text=blob,
         )
 
 

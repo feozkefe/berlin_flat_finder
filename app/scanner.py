@@ -8,6 +8,7 @@ import httpx
 
 from app import db
 from app.config import settings
+from app.dates import fill_timing, timing_passes
 from app.districts import matches_selected
 from app.matching import attach_cross_matches, contains_excluded, looks_like_wanted_ad
 from app.models import Filters, Listing, ScanResult
@@ -29,6 +30,9 @@ def listing_passes(listing: Listing, filters: Filters) -> bool:
     if listing.rooms is not None and listing.rooms + 0.01 < filters.min_rooms:
         return False
     if listing.size_sqm is not None and filters.min_sqm and listing.size_sqm < filters.min_sqm:
+        return False
+    fill_timing(listing)
+    if not timing_passes(listing, filters.start_from, filters.min_months, filters.max_months):
         return False
 
     types = set(filters.listing_types)
