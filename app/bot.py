@@ -81,13 +81,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+async def _goto_rent(query) -> int:
+    await query.edit_message_text("Max warm kira? Sadece sayı yaz, örn. 1100")
+    return RENT_PICK
+
+
 async def setup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     filters = db.load_filters()
     context.user_data["filters"] = filters.to_dict()
-    await update.message.reply_text(
-        "Mahalle seç (birden fazla olabilir), sonra Devam.",
+    old_id = context.user_data.pop("district_msg_id", None)
+    if old_id and update.effective_chat:
+        try:
+            await context.bot.delete_message(update.effective_chat.id, old_id)
+        except Exception:
+            pass
+    msg = await update.message.reply_text(
+        "Mahalleleri işaretle, bitince bir kez Devam.\n"
+        "Tüm Berlin için Hepsi — o zaman direkt kiraya geçer.",
         reply_markup=_district_keyboard(filters.districts),
     )
+    context.user_data["district_msg_id"] = msg.message_id
     return DISTRICT_PICK
 
 
@@ -98,12 +111,12 @@ async def district_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     selected: list[str] = list(data.get("districts") or [])
     action = query.data.split(":", 1)[1]
     if action == "all":
-        selected = []
-    elif action == "done":
+        data["districts"] = []
+        return await _goto_rent(query)
+    if action == "done":
         data["districts"] = selected
-        await query.edit_message_text("Max warm kira? Sadece sayı yaz, örn. 1100")
-        return RENT_PICK
-    elif action in selected:
+        return await _goto_rent(query)
+    if action in selected:
         selected.remove(action)
     else:
         selected.append(action)
@@ -269,6 +282,10 @@ def build_application() -> Application | None:
             INTERVAL_PICK: [CallbackQueryHandler(interval_pick, pattern=r"^i:")],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
+        allow_reentry=True,
+        per_chat=True,
+        per_user=True,
+        per_message=False,
     )
     application.add_handler(CommandHandler("start", start))
     application.add_handler(setup_handler)
