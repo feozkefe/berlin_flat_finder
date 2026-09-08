@@ -69,14 +69,13 @@ async def run_scan() -> ScanResult:
     first_scan = not already
     new_listings = [listing for listing in kept if listing.id not in already]
 
-    # First scan is a silent baseline so Telegram is not flooded with old ads.
-    db.upsert_listings(kept, mark_notified=first_scan)
+    db.upsert_listings(kept, mark_notified=True)
 
     finished = datetime.now(timezone.utc)
     result = ScanResult(
         started_at=started.isoformat(),
         finished_at=finished.isoformat(),
-        new_listings=[] if first_scan else new_listings,
+        new_listings=new_listings,
         total_found=len(kept),
         errors=errors,
         first_scan=first_scan,

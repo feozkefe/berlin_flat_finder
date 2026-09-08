@@ -161,7 +161,7 @@ $("scan").addEventListener("click", async () => {
     return;
   }
   $("status").textContent = data.first_scan
-    ? `İlk tarama: ${data.total_found} ilan kaydedildi. Sonrakilerde sadece yeniler Telegram'a gider.`
+    ? `İlk tarama: ${data.total_found} ilan. Linkler Telegram'a gitti.`
     : `${data.new_count} yeni ilan · ${data.total_found} eşleşen.`;
   renderListings(await fetch("/api/listings").then((r) => r.json()));
 });

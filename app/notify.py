@@ -53,13 +53,14 @@ def format_listing(listing: Listing) -> str:
 
 
 def format_scan_summary(result: ScanResult) -> str:
+    extra = f"\nHatalar: {', '.join(result.errors)}" if result.errors else ""
     if result.first_scan:
         return (
-            f"İlk tarama bitti. {result.total_found} ilan kaydedildi.\n"
-            "Bundan sonra sadece yeni gelenler mesaj olarak düşecek."
+            f"İlk tarama: {result.total_found} eşleşen ilan. Linkler aşağıda.\n"
+            "Sonraki taramalarda sadece yeniler gelir."
+            f"{extra}"
         )
     if not result.new_listings:
-        extra = f"\nHatalar: {', '.join(result.errors)}" if result.errors else ""
         return f"Tarama bitti, yeni ilan yok. Toplam eşleşen: {result.total_found}.{extra}"
     return f"{len(result.new_listings)} yeni ilan:"
 
@@ -70,12 +71,13 @@ async def send_scan_result(chat_id: str, result: ScanResult) -> None:
     bot = Bot(settings.telegram_bot_token)
     try:
         await bot.send_message(chat_id=chat_id, text=format_scan_summary(result))
-        if result.first_scan:
-            return
         for listing in result.new_listings[: settings.max_telegram_per_scan]:
             await bot.send_message(chat_id=chat_id, text=format_listing(listing), disable_web_page_preview=False)
         leftover = len(result.new_listings) - settings.max_telegram_per_scan
         if leftover > 0:
-            await bot.send_message(chat_id=chat_id, text=f"+{leftover} ilan daha var, web arayüzünden bak.")
+            await bot.send_message(
+                chat_id=chat_id,
+                text=f"+{leftover} ilan daha. Hepsini görmek için /latest veya Railway web URL.",
+            )
     except Exception:
         logger.exception("Telegram send failed")

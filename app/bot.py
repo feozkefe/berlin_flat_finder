@@ -258,7 +258,7 @@ async def resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def latest(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    rows = db.recent_listings(5)
+    rows = db.recent_listings(15)
     if not rows:
         await update.message.reply_text("Henüz kayıtlı ilan yok. /scan")
         return

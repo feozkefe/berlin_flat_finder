@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     request_timeout: float = 20.0
     max_pages_per_source: int = 2
     max_listings_per_source: int = 40
-    max_telegram_per_scan: int = 12
+    max_telegram_per_scan: int = 15
 
 
 settings = Settings()
