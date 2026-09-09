@@ -114,7 +114,7 @@ async def listings() -> dict:
 async def scan_endpoint() -> dict:
     filters = db.load_filters()
     if not filters.enabled:
-        raise HTTPException(status_code=409, detail="Taramalar duraklatıldı.")
+        raise HTTPException(status_code=409, detail="Scans are paused.")
     result = await run_scan()
     await send_scan_result(filters.telegram_chat_id, result)
     return {

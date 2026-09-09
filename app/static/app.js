@@ -46,7 +46,7 @@ function fillForm(settings) {
   $("min_rooms").value = settings.min_rooms;
   $("min_sqm").value = settings.min_sqm;
   $("start_from").value = settings.start_from || "";
-  $("min_months").value = settings.min_months ?? 0;
+  $("min_months").value = settings.min_months ?? 1;
   $("max_months").value = settings.max_months ?? 0;
   $("telegram_chat_id").value = settings.telegram_chat_id || "";
   paintChips(".district", state.districts, "id");
@@ -64,7 +64,7 @@ function collect() {
     min_rooms: Number($("min_rooms").value),
     min_sqm: Number($("min_sqm").value),
     start_from: $("start_from").value || "",
-    min_months: Number($("min_months").value) || 0,
+    min_months: Number($("min_months").value) || 1,
     max_months: Number($("max_months").value) || 0,
     listing_types: state.listing_types,
     sources: state.sources,
@@ -81,8 +81,8 @@ function providerLabel(name) {
 function renderListings(payload) {
   const scan = payload.scan;
   $("scan-meta").textContent = scan
-    ? `Son tarama: ${scan.finished_at} · ${scan.new_count} yeni / ${scan.total_count} eşleşen`
-    : "Henüz tarama yok.";
+    ? `Last scan: ${scan.finished_at} · ${scan.new_count} new / ${scan.total_count} matches`
+    : "No scan yet.";
 
   const box = $("listings");
   box.innerHTML = "";
@@ -95,12 +95,12 @@ function renderListings(payload) {
       .join(" · ");
     const contact = item.provider === "immoscout"
       ? (alts
-        ? `<span class="badge ok">ImmoScout yazılamaz · kopya: ${alts}</span>`
-        : `<span class="badge warn">ImmoScout · başka sitede kopya yok</span>`)
-      : `<span class="badge ok">yazılabilir</span>`;
+        ? `<span class="badge ok">ImmoScout no message · copy: ${alts}</span>`
+        : `<span class="badge warn">ImmoScout · no copy on other sites</span>`)
+      : `<span class="badge ok">can message</span>`;
     el.innerHTML = `
       <h3><a href="${item.url}" target="_blank" rel="noreferrer">${item.title}</a></h3>
-      <p>${[item.district || "Berlin", item.rooms ? item.rooms + " Zi" : "", item.size_sqm ? item.size_sqm + " m²" : "", item.price ? item.price + " €" : "", item.available_from ? "ab " + item.available_from : "", item.duration_months ? item.duration_months + " ay" : ""].filter(Boolean).join(" · ")}</p>
+      <p>${[item.district || "Berlin", item.rooms ? item.rooms + " Zi" : "", item.size_sqm ? item.size_sqm + " m²" : "", item.price ? item.price + " €" : "", item.available_from ? "ab " + item.available_from : "", item.duration_months ? item.duration_months + " mo" : ""].filter(Boolean).join(" · ")}</p>
       <p>${item.address || ""}</p>
       <div class="badges">
         <span class="badge">${providerLabel(item.provider)}</span>
@@ -120,8 +120,8 @@ async function load() {
   ]);
   renderDistricts(meta.districts);
   $("bot-hint").textContent = meta.bot_configured
-    ? "Telegram bot açık. Telefonda bota /start yaz, chat ID buraya düşer."
-    : ".env içine TELEGRAM_BOT_TOKEN koy, yoksa sadece web çalışır.";
+    ? "Telegram bot is on. Send /start to the bot; chat ID fills in here."
+    : "Put TELEGRAM_BOT_TOKEN in .env or only the web UI runs.";
   fillForm(settings);
   renderListings(listings);
 }
@@ -148,27 +148,27 @@ document.querySelectorAll(".interval").forEach((btn) => {
 });
 
 $("save").addEventListener("click", async () => {
-  $("status").textContent = "Kaydediliyor…";
+  $("status").textContent = "Saving…";
   const res = await fetch("/api/settings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(collect()),
   });
   fillForm(await res.json());
-  $("status").textContent = "Kaydedildi. Tarama aralığı güncellendi.";
+  $("status").textContent = "Saved. Scan interval updated.";
 });
 
 $("scan").addEventListener("click", async () => {
-  $("status").textContent = "Taranıyor, 20-40 sn sürebilir…";
+  $("status").textContent = "Scanning, 20-40 seconds…";
   const res = await fetch("/api/scan", { method: "POST" });
   const data = await res.json();
   if (!res.ok) {
-    $("status").textContent = data.detail || "Tarama olmadı.";
+    $("status").textContent = data.detail || "Scan failed.";
     return;
   }
   $("status").textContent = data.first_scan
-    ? `İlk tarama: ${data.total_found} ilan. Linkler Telegram'a gitti.`
-    : `${data.new_count} yeni ilan · ${data.total_found} eşleşen.`;
+    ? `First scan: ${data.total_found} listings. Links sent to Telegram.`
+    : `${data.new_count} new · ${data.total_found} matches.`;
   renderListings(await fetch("/api/listings").then((r) => r.json()));
 });
 

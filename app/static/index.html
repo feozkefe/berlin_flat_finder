@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -9,24 +9,24 @@
 <body>
   <header>
     <div>
-      <p class="eyebrow">kişisel arama</p>
+      <p class="eyebrow">personal search</p>
       <h1>Berlin Flat Finder</h1>
     </div>
-    <p class="lede">WG-Gesucht, Kleinanzeigen ve ImmoScout. Yeni ilan gelince Telegram.</p>
+    <p class="lede">WG-Gesucht, Kleinanzeigen and ImmoScout. New ads to Telegram.</p>
   </header>
 
   <main>
     <section class="card" id="filters">
-      <h2>Filtre</h2>
+      <h2>Filters</h2>
 
-      <label>Mahalle</label>
+      <label>Districts</label>
       <div id="districts" class="chips"></div>
 
       <div class="grid">
-        <label>Max kira (warm)
+        <label>Max rent (warm)
           <input id="max_rent" type="number" min="200" max="8000" step="50" />
         </label>
-        <label>Min oda
+        <label>Min rooms
           <input id="min_rooms" type="number" min="1" max="8" step="0.5" />
         </label>
         <label>Min m²
@@ -35,53 +35,53 @@
       </div>
 
       <div class="grid">
-        <label>Başlangıç (boş = fark etmez)
+        <label>Available from (empty = anytime)
           <input id="start_from" type="date" />
         </label>
-        <label>En az ay (0 = fark etmez)
-          <input id="min_months" type="number" min="0" max="36" step="1" />
+        <label>Min months (1 = one month+)
+          <input id="min_months" type="number" min="1" max="36" step="1" />
         </label>
-        <label>En fazla ay (0 = fark etmez)
+        <label>Max months (0 = no max)
           <input id="max_months" type="number" min="0" max="36" step="1" />
         </label>
       </div>
 
-      <label>Tip</label>
+      <label>Type</label>
       <div class="chips">
-        <button type="button" class="chip type" data-type="wg">WG odası</button>
-        <button type="button" class="chip type" data-type="apartment">Daire</button>
-        <button type="button" class="chip type" data-type="sublet">Zwischenmiete</button>
+        <button type="button" class="chip type" data-type="wg">WG room</button>
+        <button type="button" class="chip type" data-type="apartment">Apartment</button>
+        <button type="button" class="chip type" data-type="sublet">Sublet</button>
       </div>
 
-      <label>Kaynak</label>
+      <label>Sources</label>
       <div class="chips">
         <button type="button" class="chip source" data-source="wg_gesucht">WG-Gesucht</button>
         <button type="button" class="chip source" data-source="kleinanzeigen">Kleinanzeigen</button>
         <button type="button" class="chip source" data-source="immoscout">ImmoScout24</button>
       </div>
 
-      <label>Tarama aralığı</label>
+      <label>Scan interval</label>
       <div class="chips">
-        <button type="button" class="chip interval" data-hours="12">12 saat</button>
-        <button type="button" class="chip interval" data-hours="24">24 saat</button>
+        <button type="button" class="chip interval" data-hours="12">12 hours</button>
+        <button type="button" class="chip interval" data-hours="24">24 hours</button>
       </div>
 
       <label>Telegram chat ID
-        <input id="telegram_chat_id" type="text" placeholder="Bota /start yazınca otomatik dolar" />
+        <input id="telegram_chat_id" type="text" placeholder="Filled after /start on the bot" />
       </label>
       <p class="hint" id="bot-hint"></p>
 
       <div class="actions">
-        <button type="button" id="save">Kaydet</button>
-        <button type="button" id="scan" class="ghost">Şimdi tara</button>
+        <button type="button" id="save">Save</button>
+        <button type="button" id="scan" class="ghost">Scan now</button>
       </div>
       <p class="status" id="status"></p>
     </section>
 
     <section class="card">
       <div class="row">
-        <h2>İlanlar</h2>
-        <p class="hint" id="scan-meta">Henüz tarama yok.</p>
+        <h2>Listings</h2>
+        <p class="hint" id="scan-meta">No scan yet.</p>
       </div>
       <div id="listings" class="listings"></div>
     </section>

@@ -41,14 +41,14 @@ def format_listing(listing: Listing) -> str:
     if listing.provider == "immoscout":
         writable = [alt for alt in listing.alt_urls if alt.get("provider") != "immoscout"]
         if writable:
-            lines.append("✉️ ImmoScout'tan yazılamıyor — aynı ilan başka yerde:")
+            lines.append("✉️ Can't message on ImmoScout — same ad elsewhere:")
             for alt in writable:
                 label = PROVIDER_LABEL.get(alt["provider"], alt["provider"])
                 lines.append(f"   {label}: {alt['url']}")
         else:
-            lines.append("⚠️ ImmoScout: ev sahibine doğrudan yazılamıyor, başka sitede kopyası yok.")
+            lines.append("⚠️ ImmoScout: no direct message, no copy found on other sites.")
     else:
-        lines.append("✉️ Buradan yazılabilir")
+        lines.append("✉️ You can write here")
 
     lines.append(listing.url)
     return "\n".join(lines)
@@ -61,13 +61,13 @@ def format_listing_compact(listing: Listing, index: int) -> str:
         listing.district or None,
         f"{listing.rooms:g} Zi" if listing.rooms else None,
         f"ab {listing.available_from}" if listing.available_from else None,
-        f"{listing.duration_months} ay" if listing.duration_months else None,
+        f"{listing.duration_months} mo" if listing.duration_months else None,
     ]
     meta = " · ".join(bit for bit in bits if bit)
     extra = ""
     if listing.provider == "immoscout":
         writable = [alt for alt in listing.alt_urls if alt.get("provider") != "immoscout"]
-        extra = "\n" + "\n".join(alt["url"] for alt in writable) if writable else " (yazılamaz)"
+        extra = "\n" + "\n".join(alt["url"] for alt in writable) if writable else " (can't message)"
     return f"{index}. {label} · {meta}\n{listing.title}\n{listing.url}{extra}"
 
 
@@ -81,16 +81,16 @@ async def send_listing_batches(bot: Bot, chat_id: str, listings: list[Listing]) 
 
 
 def format_scan_summary(result: ScanResult) -> str:
-    extra = f"\nHatalar: {', '.join(result.errors)}" if result.errors else ""
+    extra = f"\nErrors: {', '.join(result.errors)}" if result.errors else ""
     if result.first_scan:
         return (
-            f"İlk tarama: {result.total_found} eşleşen ilan. Linkler aşağıda.\n"
-            "Sonraki taramalarda sadece yeniler gelir."
+            f"First scan: {result.total_found} matching listings. Links below.\n"
+            "Later scans only send new ones."
             f"{extra}"
         )
     if not result.new_listings:
-        return f"Tarama bitti, yeni ilan yok. Toplam eşleşen: {result.total_found}.{extra}"
-    return f"{len(result.new_listings)} yeni ilan:"
+        return f"Scan done, nothing new. Matches: {result.total_found}.{extra}"
+    return f"{len(result.new_listings)} new listings:"
 
 
 async def send_scan_result(chat_id: str, result: ScanResult) -> None:

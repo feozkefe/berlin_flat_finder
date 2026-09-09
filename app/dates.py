@@ -43,13 +43,15 @@ def parse_user_start(text: str) -> str:
 
 
 def parse_user_months(text: str) -> tuple[int, int] | None:
-    raw = (text or "").strip().lower().replace(" ", "")
-    if raw in _ANY:
-        return (0, 0)
+    raw = (text or "").strip().lower()
+    raw = re.sub(r"\b(min|max|at least|en az|ay|month|months|monat|monate)\b", "", raw)
+    raw = raw.replace(" ", "")
+    if raw in _ANY or raw == "":
+        return (1, 0)
     match = re.fullmatch(r"(\d{1,2})(?:[-/](\d{1,2}))?", raw)
     if not match:
         return None
-    low = int(match.group(1))
+    low = max(1, int(match.group(1)))
     high = int(match.group(2)) if match.group(2) else 0
     if low > 36 or high > 36:
         return None

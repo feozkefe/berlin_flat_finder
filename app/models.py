@@ -27,7 +27,7 @@ class Filters:
     sources: list[str] = field(default_factory=lambda: list(SOURCES))
     interval_hours: int = 12
     start_from: str = ""
-    min_months: int = 0
+    min_months: int = 1
     max_months: int = 0
     telegram_chat_id: str = ""
     exclude_keywords: list[str] = field(default_factory=lambda: list(DEFAULT_EXCLUDE))
@@ -64,8 +64,10 @@ class Filters:
             base.min_months = int(base.min_months or 0)
             base.max_months = int(base.max_months or 0)
         except (TypeError, ValueError):
-            base.min_months = 0
+            base.min_months = 1
             base.max_months = 0
+        if base.min_months <= 0:
+            base.min_months = 1
         base.start_from = str(base.start_from or "").strip()
         base.listing_types = [t for t in base.listing_types if t in LISTING_TYPES] or list(LISTING_TYPES)
         base.sources = [s for s in base.sources if s in SOURCES] or list(SOURCES)

@@ -9,7 +9,10 @@ def test_parse_start_and_months():
     assert parse_user_start("0") == ""
     assert parse_user_start("01.10.2026") == "2026-10-01"
     assert parse_user_start("xyz") == "invalid"
-    assert parse_user_months("0") == (0, 0)
+    assert parse_user_months("0") == (1, 0)
+    assert parse_user_months("1") == (1, 0)
+    assert parse_user_months("1 ay") == (1, 0)
+    assert parse_user_months("1 month") == (1, 0)
     assert parse_user_months("6") == (6, 0)
     assert parse_user_months("6-12") == (6, 12)
 

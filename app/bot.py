@@ -37,13 +37,13 @@ def _district_keyboard(selected: list[str]) -> InlineKeyboardMarkup:
             row = []
     if row:
         rows.append(row)
-    rows.append([InlineKeyboardButton("Hepsi / fark etmez", callback_data="d:all")])
-    rows.append([InlineKeyboardButton("Devam →", callback_data="d:done")])
+    rows.append([InlineKeyboardButton("All Berlin / no preference", callback_data="d:all")])
+    rows.append([InlineKeyboardButton("Continue →", callback_data="d:done")])
     return InlineKeyboardMarkup(rows)
 
 
 def _type_keyboard(selected: list[str]) -> InlineKeyboardMarkup:
-    labels = {"wg": "WG odası", "apartment": "Daire", "sublet": "Zwischenmiete / sublet"}
+    labels = {"wg": "WG room", "apartment": "Apartment", "sublet": "Sublet / Zwischenmiete"}
     buttons = [
         InlineKeyboardButton(
             f"{'✓ ' if key in selected else ''}{label}",
@@ -51,28 +51,26 @@ def _type_keyboard(selected: list[str]) -> InlineKeyboardMarkup:
         )
         for key, label in labels.items()
     ]
-    return InlineKeyboardMarkup([buttons[:2], buttons[2:], [InlineKeyboardButton("Devam →", callback_data="t:done")]])
+    return InlineKeyboardMarkup([buttons[:2], buttons[2:], [InlineKeyboardButton("Continue →", callback_data="t:done")]])
 
 
 def _interval_keyboard(current: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton(("✓ " if current == 12 else "") + "12 saat", callback_data="i:12"),
-                InlineKeyboardButton(("✓ " if current == 24 else "") + "24 saat", callback_data="i:24"),
+                InlineKeyboardButton(("✓ " if current == 12 else "") + "12 hours", callback_data="i:12"),
+                InlineKeyboardButton(("✓ " if current == 24 else "") + "24 hours", callback_data="i:24"),
             ]
         ]
     )
 
 
 def _months_label(filters: Filters) -> str:
-    if not filters.min_months and not filters.max_months:
-        return "fark etmez"
     if filters.min_months and filters.max_months:
-        return f"{filters.min_months}-{filters.max_months} ay"
+        return f"{filters.min_months}-{filters.max_months} months"
     if filters.min_months:
-        return f"en az {filters.min_months} ay"
-    return f"en fazla {filters.max_months} ay"
+        return f"min {filters.min_months} month" + ("s" if filters.min_months != 1 else "")
+    return f"max {filters.max_months} months"
 
 
 def _bind_chat(filters: Filters, chat_id: int | str) -> Filters:
@@ -84,17 +82,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     filters = _bind_chat(db.load_filters(), update.effective_chat.id)
     await update.message.reply_text(
         "Berlin Flat Finder.\n\n"
-        "Filtreleri buradan kur: /setup\n"
-        "Durum: /status\n"
-        "Hemen tara: /scan\n"
-        "Durdur / aç: /pause /resume\n"
-        "Kayıtlı ilanları sil: /reset\n\n"
-        f"Chat bağlandı. Şu an {filters.interval_hours} saatte bir tarama."
+        "Set filters: /setup\n"
+        "Status: /status\n"
+        "Scan now: /scan\n"
+        "Pause / resume: /pause /resume\n"
+        "Clear saved listings: /reset\n\n"
+        f"Chat linked. Scanning every {filters.interval_hours} hours."
     )
 
 
 async def _goto_rent(query) -> int:
-    await query.edit_message_text("Max warm kira? Sadece sayı yaz, örn. 1100")
+    await query.edit_message_text("Max warm rent? Number only, e.g. 1100")
     return RENT_PICK
 
 
@@ -108,8 +106,8 @@ async def setup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         except Exception:
             pass
     msg = await update.message.reply_text(
-        "Mahalleleri işaretle, bitince bir kez Devam.\n"
-        "Tüm Berlin için Hepsi — o zaman direkt kiraya geçer.",
+        "Tap districts, then Continue once.\n"
+        "All Berlin → skip districts and go to rent.",
         reply_markup=_district_keyboard(filters.districts),
     )
     context.user_data["district_msg_id"] = msg.message_id
@@ -144,10 +142,10 @@ async def rent_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         if rent < 200 or rent > 8000:
             raise ValueError
     except ValueError:
-        await update.message.reply_text("200-8000 arası bir sayı yaz, örn. 1100")
+        await update.message.reply_text("Enter a number between 200 and 8000, e.g. 1100")
         return RENT_PICK
     context.user_data["filters"]["max_rent"] = rent
-    await update.message.reply_text("Minimum oda? 1 / 1.5 / 2 ...")
+    await update.message.reply_text("Minimum rooms? 1 / 1.5 / 2 ...")
     return ROOMS_PICK
 
 
@@ -157,12 +155,12 @@ async def rooms_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         if rooms < 1 or rooms > 8:
             raise ValueError
     except ValueError:
-        await update.message.reply_text("1 ile 8 arası bir sayı yaz.")
+        await update.message.reply_text("Enter a number between 1 and 8.")
         return ROOMS_PICK
     context.user_data["filters"]["min_rooms"] = rooms
     await update.message.reply_text(
-        "Ne zamandan itibaren? örn. 01.10.2026\n"
-        "0 = fark etmez / hemen"
+        "Available from? e.g. 01.10.2026\n"
+        "0 = anytime / immediately"
     )
     return DATE_PICK
 
@@ -170,12 +168,12 @@ async def rooms_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def date_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     parsed = parse_user_start(update.message.text or "")
     if parsed == "invalid":
-        await update.message.reply_text("Tarih 01.10.2026 veya 0 olsun.")
+        await update.message.reply_text("Use 01.10.2026 or 0.")
         return DATE_PICK
     context.user_data["filters"]["start_from"] = parsed
     await update.message.reply_text(
-        "Kaç aylık? En az ay, veya aralık.\n"
-        "örn. 6  |  6-12  |  0 = fark etmez"
+        "How many months? Minimum 1.\n"
+        "e.g. 1  |  6  |  6-12"
     )
     return MONTHS_PICK
 
@@ -183,13 +181,13 @@ async def date_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def months_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     parsed = parse_user_months(update.message.text or "")
     if parsed is None:
-        await update.message.reply_text("6 veya 6-12 veya 0 yaz.")
+        await update.message.reply_text("Write 1 or 6-12.")
         return MONTHS_PICK
     context.user_data["filters"]["min_months"] = parsed[0]
     context.user_data["filters"]["max_months"] = parsed[1]
     types = context.user_data["filters"].get("listing_types") or ["wg", "apartment", "sublet"]
     await update.message.reply_text(
-        "Ne arıyorsun? İstediğini işaretle, sonra Devam.",
+        "What are you looking for? Toggle, then Continue.",
         reply_markup=_type_keyboard(types),
     )
     return TYPE_PICK
@@ -206,7 +204,7 @@ async def type_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         context.user_data["filters"]["listing_types"] = selected
         interval = int(context.user_data["filters"].get("interval_hours") or 12)
         await query.edit_message_text(
-            "Kaç saatte bir tarayayım?",
+            "How often should I scan?",
             reply_markup=_interval_keyboard(interval),
         )
         return INTERVAL_PICK
@@ -230,17 +228,17 @@ async def interval_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     filters = db.save_filters(Filters.from_dict(payload))
     names = ", ".join(
         next((d.name for d in DISTRICTS if d.id == item), item) for item in filters.districts
-    ) or "tüm Berlin"
+    ) or "all Berlin"
     await query.edit_message_text(
-        "Kaydedildi.\n"
-        f"Mahalle: {names}\n"
-        f"Max kira: {filters.max_rent} €\n"
-        f"Min oda: {filters.min_rooms:g}\n"
-        f"Başlangıç: {filters.start_from or 'fark etmez'}\n"
-        f"Süre: {_months_label(filters)}\n"
-        f"Tipler: {', '.join(filters.listing_types)}\n"
-        f"Aralık: {filters.interval_hours} saat\n\n"
-        "Hemen denemek için /scan"
+        "Saved.\n"
+        f"Districts: {names}\n"
+        f"Max rent: {filters.max_rent} €\n"
+        f"Min rooms: {filters.min_rooms:g}\n"
+        f"Available from: {filters.start_from or 'anytime'}\n"
+        f"Duration: {_months_label(filters)}\n"
+        f"Types: {', '.join(filters.listing_types)}\n"
+        f"Scan every: {filters.interval_hours} hours\n\n"
+        "Try /scan now"
     )
     scheduler = context.application.bot_data.get("reschedule")
     if scheduler:
@@ -249,7 +247,7 @@ async def interval_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text("İptal.")
+    await update.message.reply_text("Cancelled.")
     return ConversationHandler.END
 
 
@@ -258,53 +256,53 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     scan = db.latest_scan()
     names = ", ".join(
         next((d.name for d in DISTRICTS if d.id == item), item) for item in filters.districts
-    ) or "tüm Berlin"
-    last = "henüz yok"
+    ) or "all Berlin"
+    last = "none yet"
     if scan:
-        last = f"{scan['finished_at']} — {scan['new_count']} yeni / {scan['total_count']} eşleşen"
+        last = f"{scan['finished_at']} — {scan['new_count']} new / {scan['total_count']} matches"
     await update.message.reply_text(
-        f"{'Açık' if filters.enabled else 'Duraklatıldı'}\n"
-        f"Mahalle: {names}\n"
-        f"Max kira: {filters.max_rent} € · min {filters.min_rooms:g} oda · {filters.min_sqm} m²\n"
-        f"Başlangıç: {filters.start_from or 'fark etmez'} · süre: {_months_label(filters)}\n"
-        f"Tip: {', '.join(filters.listing_types)}\n"
-        f"Kaynak: {', '.join(filters.sources)}\n"
-        f"Aralık: {filters.interval_hours} saat\n"
-        f"Son tarama: {last}"
+        f"{'On' if filters.enabled else 'Paused'}\n"
+        f"Districts: {names}\n"
+        f"Max rent: {filters.max_rent} € · min {filters.min_rooms:g} rooms · {filters.min_sqm} m²\n"
+        f"Available from: {filters.start_from or 'anytime'} · duration: {_months_label(filters)}\n"
+        f"Types: {', '.join(filters.listing_types)}\n"
+        f"Sources: {', '.join(filters.sources)}\n"
+        f"Every {filters.interval_hours} hours\n"
+        f"Last scan: {last}"
     )
 
 
 async def scan_now(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     filters = _bind_chat(db.load_filters(), update.effective_chat.id)
-    await update.message.reply_text("Tarıyorum, 20-40 sn sürebilir...")
+    await update.message.reply_text("Scanning, can take 20-40 seconds...")
     result = await run_scan()
     await send_scan_result(filters.telegram_chat_id, result)
     if result.new_listings:
         return
     if not result.first_scan:
-        await update.message.reply_text("Yeni ilan çıkmadı.")
+        await update.message.reply_text("No new listings.")
 
 
 async def pause(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     filters = db.load_filters()
     filters.enabled = False
     _bind_chat(filters, update.effective_chat.id)
-    await update.message.reply_text("Taramalar durdu. /resume ile aç.")
+    await update.message.reply_text("Scans paused. /resume to turn them back on.")
 
 
 async def resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     filters = db.load_filters()
     filters.enabled = True
     _bind_chat(filters, update.effective_chat.id)
-    await update.message.reply_text("Taramalar açık.")
+    await update.message.reply_text("Scans are on.")
 
 
 async def latest(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     rows = db.recent_listings(200)
     if not rows:
-        await update.message.reply_text("Henüz kayıtlı ilan yok. /scan")
+        await update.message.reply_text("No saved listings yet. /scan")
         return
-    await update.message.reply_text(f"{len(rows)} kayıtlı ilan:")
+    await update.message.reply_text(f"{len(rows)} saved listings:")
     listings = [Listing.from_dict(row) for row in rows]
     await send_listing_batches(context.bot, str(update.effective_chat.id), listings)
 
@@ -312,14 +310,14 @@ async def latest(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def reset_listings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     count = db.clear_listings()
     await update.message.reply_text(
-        f"{count} kayıtlı ilan silindi. Filtre duruyor.\n"
-        "Hepsini linkleriyle görmek için /scan"
+        f"Cleared {count} saved listings. Filters kept.\n"
+        "Run /scan to fetch them again with links."
     )
 
 
 def build_application() -> Application | None:
     if not settings.telegram_bot_token:
-        logger.warning("TELEGRAM_BOT_TOKEN boş — bot kapalı, sadece web çalışır.")
+        logger.warning("TELEGRAM_BOT_TOKEN empty — bot off, web only.")
         return None
 
     application = Application.builder().token(settings.telegram_bot_token).build()
