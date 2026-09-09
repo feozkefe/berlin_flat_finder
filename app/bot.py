@@ -145,7 +145,10 @@ async def rent_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         await update.message.reply_text("Enter a number between 200 and 8000, e.g. 1100")
         return RENT_PICK
     context.user_data["filters"]["max_rent"] = rent
-    await update.message.reply_text("Minimum rooms? 1 / 1.5 / 2 ...")
+    await update.message.reply_text(
+        "Minimum rooms? 1 / 1.5 / 2 ...\n"
+        "Only applies to whole apartments — WG rooms are always one room."
+    )
     return ROOMS_PICK
 
 

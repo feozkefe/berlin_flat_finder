@@ -15,9 +15,9 @@ from app import db
 from app.bot import build_application
 from app.config import settings
 from app.districts import public_districts
-from app.models import Filters
+from app.models import Filters, Listing
 from app.notify import send_scan_result
-from app.scanner import run_scan
+from app.scanner import rank, run_scan
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -107,7 +107,10 @@ async def post_settings(payload: dict) -> dict:
 
 @api.get("/api/listings")
 async def listings() -> dict:
-    return {"listings": db.recent_listings(), "scan": db.latest_scan()}
+    rows = db.recent_listings()
+    ordered = rank([Listing.from_dict(row) for row in rows])
+    by_id = {row["id"]: row for row in rows}
+    return {"listings": [by_id[item.id] for item in ordered], "scan": db.latest_scan()}
 
 
 @api.post("/api/scan")

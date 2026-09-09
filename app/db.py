@@ -38,6 +38,11 @@ def init_db() -> None:
                 address TEXT,
                 district TEXT,
                 image_url TEXT,
+                postcode TEXT,
+                listing_kind TEXT,
+                flat_rooms REAL,
+                flatmates INTEGER,
+                private_landlord INTEGER,
                 available_from TEXT,
                 available_to TEXT,
                 duration_months INTEGER,
@@ -60,10 +65,17 @@ def init_db() -> None:
             """
         )
         cols = {row[1] for row in conn.execute("PRAGMA table_info(listings)")}
-        if "available_to" not in cols:
-            conn.execute("ALTER TABLE listings ADD COLUMN available_to TEXT")
-        if "duration_months" not in cols:
-            conn.execute("ALTER TABLE listings ADD COLUMN duration_months INTEGER")
+        for name, ddl in (
+            ("available_to", "TEXT"),
+            ("duration_months", "INTEGER"),
+            ("postcode", "TEXT"),
+            ("listing_kind", "TEXT"),
+            ("flat_rooms", "REAL"),
+            ("flatmates", "INTEGER"),
+            ("private_landlord", "INTEGER"),
+        ):
+            if name not in cols:
+                conn.execute(f"ALTER TABLE listings ADD COLUMN {name} {ddl}")
         conn.commit()
 
 
@@ -118,9 +130,10 @@ def upsert_listings(listings: list[Listing], *, mark_notified: bool) -> None:
                 """
                 INSERT INTO listings (
                     id, provider, title, url, price, rooms, size_sqm, address,
-                    district, image_url, available_from, available_to, duration_months,
+                    district, image_url, postcode, listing_kind, flat_rooms, flatmates,
+                    private_landlord, available_from, available_to, duration_months,
                     is_sublet, contactable, alt_urls, first_seen, last_seen, notified
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     title = excluded.title,
                     url = excluded.url,
@@ -130,6 +143,11 @@ def upsert_listings(listings: list[Listing], *, mark_notified: bool) -> None:
                     address = excluded.address,
                     district = excluded.district,
                     image_url = excluded.image_url,
+                    postcode = excluded.postcode,
+                    listing_kind = excluded.listing_kind,
+                    flat_rooms = excluded.flat_rooms,
+                    flatmates = excluded.flatmates,
+                    private_landlord = excluded.private_landlord,
                     available_from = excluded.available_from,
                     available_to = excluded.available_to,
                     duration_months = excluded.duration_months,
@@ -149,6 +167,11 @@ def upsert_listings(listings: list[Listing], *, mark_notified: bool) -> None:
                     listing.address,
                     listing.district,
                     listing.image_url,
+                    listing.postcode,
+                    listing.listing_kind,
+                    listing.flat_rooms,
+                    listing.flatmates,
+                    int(listing.private_landlord),
                     listing.available_from,
                     listing.available_to,
                     listing.duration_months,
@@ -207,6 +230,11 @@ def latest_scan() -> dict[str, Any] | None:
     }
 
 
+def _get(row: sqlite3.Row, column: str) -> Any:
+    """Tolerate rows written before a migration added the column."""
+    return row[column] if column in row.keys() else None
+
+
 def _row_to_listing_dict(row: sqlite3.Row) -> dict[str, Any]:
     return {
         "id": row["id"],
@@ -219,9 +247,14 @@ def _row_to_listing_dict(row: sqlite3.Row) -> dict[str, Any]:
         "address": row["address"],
         "district": row["district"],
         "image_url": row["image_url"],
+        "postcode": _get(row, "postcode") or "",
+        "listing_kind": _get(row, "listing_kind") or "apartment",
+        "flat_rooms": _get(row, "flat_rooms"),
+        "flatmates": _get(row, "flatmates"),
+        "private_landlord": bool(_get(row, "private_landlord")),
         "available_from": row["available_from"],
-        "available_to": row["available_to"] if "available_to" in row.keys() else None,
-        "duration_months": row["duration_months"] if "duration_months" in row.keys() else None,
+        "available_to": _get(row, "available_to"),
+        "duration_months": _get(row, "duration_months"),
         "is_sublet": bool(row["is_sublet"]),
         "contactable": bool(row["contactable"]),
         "alt_urls": json.loads(row["alt_urls"] or "[]"),

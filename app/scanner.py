@@ -17,32 +17,61 @@ from app.sources import SOURCE_MAP
 logger = logging.getLogger(__name__)
 
 
+def matches_wanted_type(listing: Listing, filters: Filters) -> bool:
+    """listing_kind says what the ad is; listing_types says what the user wants."""
+    types = set(filters.listing_types)
+    if not types:
+        return True
+    if listing.is_sublet:
+        if "sublet" not in types:
+            return False
+        if types == {"sublet"}:
+            return True
+    wanted = "wg" if listing.listing_kind == "wg" else "apartment"
+    return wanted in types
+
+
 def listing_passes(listing: Listing, filters: Filters) -> bool:
     blob = f"{listing.title} {listing.address} {listing.district}"
     if looks_like_wanted_ad(listing.title):
         return False
     if contains_excluded(blob, filters.exclude_keywords):
         return False
-    if not matches_selected(blob, filters.districts):
+    if not matches_selected(blob, filters.districts, listing.postcode or None):
         return False
     if listing.price is not None and listing.price > filters.max_rent:
         return False
-    if listing.rooms is not None and listing.rooms + 0.01 < filters.min_rooms:
-        return False
-    if listing.size_sqm is not None and filters.min_sqm and listing.size_sqm < filters.min_sqm:
-        return False
+
+    # A WG ad is one room in someone else's flat: its room count and square metres
+    # describe the flat, not what you rent. Size filters only make sense for flats.
+    if listing.listing_kind != "wg":
+        if listing.rooms is not None and listing.rooms + 0.01 < filters.min_rooms:
+            return False
+        if listing.size_sqm is not None and filters.min_sqm and listing.size_sqm < filters.min_sqm:
+            return False
+
     fill_timing(listing)
     if not timing_passes(listing, filters.start_from, filters.min_months, filters.max_months):
         return False
 
-    types = set(filters.listing_types)
-    if types == {"sublet"}:
-        return listing.is_sublet
-    if types == {"wg"} and listing.provider == "immoscout":
-        return False
-    if "sublet" not in types and listing.is_sublet:
-        return False
-    return True
+    return matches_wanted_type(listing, filters)
+
+
+def rank(listings: list[Listing]) -> list[Listing]:
+    """Ads you can actually write to come first — that is the whole point of a hit."""
+
+    def key(listing: Listing) -> tuple:
+        writable = listing.contactable or bool(
+            [alt for alt in listing.alt_urls if alt.get("provider") != listing.provider]
+        )
+        return (
+            0 if writable else 1,
+            0 if listing.private_landlord else 1,
+            0 if listing.available_from else 1,
+            listing.price if listing.price is not None else 10**6,
+        )
+
+    return sorted(listings, key=key)
 
 
 async def run_scan() -> ScanResult:
@@ -67,7 +96,7 @@ async def run_scan() -> ScanResult:
             await asyncio.sleep(1.2)
 
     found = attach_cross_matches(found)
-    kept = [listing for listing in found if listing_passes(listing, filters)]
+    kept = rank([listing for listing in found if listing_passes(listing, filters)])
 
     already = db.known_ids()
     first_scan = not already

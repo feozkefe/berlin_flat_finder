@@ -2,13 +2,21 @@ from __future__ import annotations
 
 import re
 
-from app.districts import fold
+from app.districts import extract_plz, fold
 from app.models import Listing
 
 _STREET_RE = re.compile(
     r"([a-z]+(?:\s+[a-z]+)*\s+(?:str|strasse|platz|allee|weg|ufer|damm|ring|gasse|chaussee))\s*\d*",
 )
-_PLZ_RE = re.compile(r"\b(1[0-4]\d{3})\b")
+_NEGATIONS =("ohne", "kein", "keine", "nicht", "without", "no")
+_WANTED_PHRASES = (
+    "suche nachmieter",
+    "wohnung gesucht",
+    "zimmer gesucht",
+    "wg zimmer gesucht",
+    "nachmieter gesucht",
+    "suche dringend",
+)
 _SUBLET_WORDS = (
     "zwischenmiete",
     "untermiete",
@@ -19,11 +27,6 @@ _SUBLET_WORDS = (
     "befristete miete",
     "limited",
 )
-
-
-def extract_plz(text: str) -> str | None:
-    match = _PLZ_RE.search(text or "")
-    return match.group(1) if match else None
 
 
 def normalize_street(address: str) -> str | None:
@@ -42,13 +45,36 @@ def looks_like_sublet(text: str) -> bool:
 
 
 def looks_like_wanted_ad(title: str) -> bool:
+    """Someone looking for a flat, not offering one."""
     folded = fold(title)
-    return folded.startswith("suche") or folded.startswith("gesucht") or "suche nachmieter" in folded
+    if folded.startswith(("suche", "gesucht", "wir suchen", "ich suche", "looking for")):
+        return True
+    return any(phrase in folded for phrase in _WANTED_PHRASES)
 
 
 def contains_excluded(text: str, keywords: list[str]) -> bool:
     haystack = fold(text)
-    return any(fold(keyword) in haystack for keyword in keywords if keyword.strip())
+    for keyword in keywords:
+        folded = fold(keyword)
+        if not folded:
+            continue
+        if any(not _is_negated(haystack, at) for at in _positions(haystack, folded)):
+            return True
+    return False
+
+
+def _positions(haystack: str, needle: str) -> list[int]:
+    found, at = [], haystack.find(needle)
+    while at != -1:
+        found.append(at)
+        at = haystack.find(needle, at + 1)
+    return found
+
+
+def _is_negated(haystack: str, at: int) -> bool:
+    """'ohne WBS' / 'kein WBS' are selling points, not a reason to drop the ad."""
+    before = haystack[max(0, at - 20) : at]
+    return any(word in before for word in _NEGATIONS)
 
 
 def _close(a: float | None, b: float | None, tolerance: float) -> bool:
@@ -63,8 +89,8 @@ def same_listing(left: Listing, right: Listing) -> bool:
 
     street_a = normalize_street(left.address)
     street_b = normalize_street(right.address)
-    plz_a = extract_plz(f"{left.address} {left.title}")
-    plz_b = extract_plz(f"{right.address} {right.title}")
+    plz_a = left.postcode or extract_plz(f"{left.address} {left.title}")
+    plz_b = right.postcode or extract_plz(f"{right.address} {right.title}")
     price_close = _close(left.price, right.price, 80)
     size_close = _close(left.size_sqm, right.size_sqm, 8)
     rooms_close = _close(left.rooms, right.rooms, 0.5)

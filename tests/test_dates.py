@@ -1,6 +1,15 @@
 from datetime import date, timedelta
 
-from app.dates import parse_user_months, parse_user_start, timing_passes
+from app.dates import (
+    extract_date_range,
+    extract_duration_months,
+    fill_timing,
+    months_between,
+    parse_available_from,
+    parse_user_months,
+    parse_user_start,
+    timing_passes,
+)
 from app.models import Filters, Listing
 from app.scanner import listing_passes
 
@@ -15,6 +24,64 @@ def test_parse_start_and_months():
     assert parse_user_months("1 month") == (1, 0)
     assert parse_user_months("6") == (6, 0)
     assert parse_user_months("6-12") == (6, 12)
+
+
+def test_german_month_plurals_are_durations():
+    assert extract_duration_months("Mindestmietdauer 6 Monate") == 6
+    assert extract_duration_months("Vermietung für 3 Monaten") == 3
+    assert extract_duration_months("Sublet for 4 months") == 4
+
+
+def test_deposit_in_months_is_not_a_duration():
+    assert extract_duration_months("Kaution 3 Monatsmieten") is None
+    assert extract_duration_months("Kaution: 2 Monate") is None
+
+
+def test_move_in_date_needs_an_availability_cue():
+    soon = date.today() + timedelta(days=30)
+    stamp = soon.strftime("%d.%m.%Y")
+    assert parse_available_from(f"Frei ab {stamp}") == soon
+    assert parse_available_from(f"Sanierte Wohnung zum {stamp}!") == soon
+    assert parse_available_from("Ab sofort zu vergeben") == date.today()
+    # A bare date in the ad copy is not a move-in date.
+    assert parse_available_from("Neubau aus dem Jahr 1970, saniert 12.05.2019") is None
+
+
+def test_year_less_dates_resolve_forward():
+    found = parse_available_from("WG Zimmer ab 1.10 frei")
+    assert found is not None and (found.month, found.day) == (10, 1)
+    assert found >= date.today() - timedelta(days=45)
+
+
+def test_sublet_window_gives_start_end_and_length():
+    start = date.today() + timedelta(days=20)
+    end = start + timedelta(days=60)
+    window = extract_date_range(f"Zwischenmiete {start:%d.%m.%Y}-{end:%d.%m.%Y}")
+    assert window == (start, end)
+    # 01.10.-30.11. spans two months, not one.
+    assert months_between(date(2026, 10, 1), date(2026, 11, 30)) == 2
+
+
+def test_fill_timing_ignores_dates_without_a_cue():
+    listing = Listing(id="1", provider="kleinanzeigen", title="Altbau von 1904", url="u")
+    fill_timing(listing, extra_text="Renoviert am 03.04.2021. Kaution 3 Monatsmieten.")
+    assert listing.available_from is None
+    assert listing.duration_months is None
+
+
+def test_fill_timing_reads_a_sublet_window():
+    start = date.today() + timedelta(days=20)
+    end = start + timedelta(days=91)
+    listing = Listing(
+        id="2",
+        provider="kleinanzeigen",
+        title=f"Zwischenmiete {start:%d.%m.%Y}-{end:%d.%m.%Y}",
+        url="u",
+    )
+    fill_timing(listing)
+    assert listing.available_from == start.strftime("%d.%m.%Y")
+    assert listing.available_to == end.strftime("%d.%m.%Y")
+    assert listing.duration_months == 3
 
 
 def test_start_from_drops_late_listings():

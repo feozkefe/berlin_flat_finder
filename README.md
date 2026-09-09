@@ -46,9 +46,11 @@ Both paths write the same settings.
 
 1. Districts (multi-select) → Continue
 2. Max warm rent, e.g. `1100`
-3. Min rooms, e.g. `2`
-4. Type: WG room / apartment / sublet → Continue
-5. **12 hours** or **24 hours**
+3. Min rooms, e.g. `2` — whole apartments only; a WG ad is one room by definition
+4. Available from, e.g. `01.10.2026` (or `0` for anytime)
+5. Duration in months, e.g. `1`, `6`, `6-12`
+6. Type: WG room / apartment / sublet → Continue
+7. **12 hours** or **24 hours**
 
 Commands: `/status` `/scan` `/latest` `/pause` `/resume` `/cancel`
 
@@ -63,6 +65,19 @@ Commands: `/status` `/scan` `/latest` `/pause` `/resume` `/cancel`
 | WG-Gesucht | WG and sublets, contactable |
 | Kleinanzeigen | Flats / WG / sublets, contactable |
 | ImmoScout24 | Often early; not contactable; we look for a copy elsewhere |
+
+Results are ordered so the ads you can write to come first — private landlords
+ahead of agencies, and view-only ImmoScout ads last.
+
+**How filters are applied**
+
+- **District** comes from the postcode, not the ad text. Ads name-drop the Kiez
+  they wish they were in; the PLZ is the only signal all three sites agree on.
+- **Min rooms / min m²** apply to whole apartments only. A WG ad is one room in
+  someone else's flat, and its room count describes that flat.
+- **Available from** is read only where the ad says it is a move-in date
+  ("frei ab", "zum", "ab sofort"). Build years and posting stamps are ignored.
+- **Duration** ignores deposits quoted in months ("Kaution 3 Monatsmieten").
 
 No Immowelt (JS-heavy page).
 

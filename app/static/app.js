@@ -78,6 +78,27 @@ function providerLabel(name) {
   return { wg_gesucht: "WG-Gesucht", kleinanzeigen: "Kleinanzeigen", immoscout: "ImmoScout24" }[name] || name;
 }
 
+function writableAlts(item) {
+  return (item.alt_urls || []).filter((alt) => alt.provider !== item.provider);
+}
+
+function canMessage(item) {
+  return item.contactable || writableAlts(item).length > 0;
+}
+
+function metaLine(item) {
+  const rooms = item.listing_kind === "wg"
+    ? (item.flatmates ? `room in ${item.flatmates + 1}-person WG` : "WG room")
+    : (item.rooms ? `${item.rooms} Zi` : "");
+  const timing = [
+    item.available_from ? `from ${item.available_from}` : "",
+    item.available_to ? `until ${item.available_to}` : (item.duration_months ? `${item.duration_months} months` : ""),
+  ].filter(Boolean).join(" · ");
+  return [item.district || "Berlin", rooms, item.size_sqm ? `${item.size_sqm} m²` : "", item.price ? `${item.price} €` : "", timing]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 function renderListings(payload) {
   const scan = payload.scan;
   $("scan-meta").textContent = scan
@@ -86,25 +107,33 @@ function renderListings(payload) {
 
   const box = $("listings");
   box.innerHTML = "";
-  (payload.listings || []).forEach((item) => {
+  // Same order as Telegram: ads you can actually write to come first.
+  const items = payload.listings || [];
+  const ordered = [...items.filter(canMessage), ...items.filter((item) => !canMessage(item))];
+
+  ordered.forEach((item) => {
     const el = document.createElement("article");
-    el.className = "listing";
-    const alts = (item.alt_urls || [])
-      .filter((alt) => alt.provider !== item.provider)
+    el.className = canMessage(item) ? "listing writable" : "listing";
+    const alts = writableAlts(item)
       .map((alt) => `<a href="${alt.url}" target="_blank" rel="noreferrer">${providerLabel(alt.provider)}</a>`)
       .join(" · ");
-    const contact = item.provider === "immoscout"
-      ? (alts
-        ? `<span class="badge ok">ImmoScout no message · copy: ${alts}</span>`
-        : `<span class="badge warn">ImmoScout · no copy on other sites</span>`)
-      : `<span class="badge ok">can message</span>`;
+    let contact;
+    if (item.contactable) {
+      contact = `<span class="badge ok">✉️ can message</span>`;
+    } else if (alts) {
+      contact = `<span class="badge ok">✉️ write via ${alts}</span>`;
+    } else {
+      contact = `<span class="badge warn">👀 view only</span>`;
+    }
     el.innerHTML = `
       <h3><a href="${item.url}" target="_blank" rel="noreferrer">${item.title}</a></h3>
-      <p>${[item.district || "Berlin", item.rooms ? item.rooms + " Zi" : "", item.size_sqm ? item.size_sqm + " m²" : "", item.price ? item.price + " €" : "", item.available_from ? "ab " + item.available_from : "", item.duration_months ? item.duration_months + " mo" : ""].filter(Boolean).join(" · ")}</p>
+      <p>${metaLine(item)}</p>
       <p>${item.address || ""}</p>
       <div class="badges">
         <span class="badge">${providerLabel(item.provider)}</span>
+        ${item.listing_kind === "wg" ? '<span class="badge">WG</span>' : ""}
         ${item.is_sublet ? '<span class="badge">sublet</span>' : ""}
+        ${item.private_landlord ? '<span class="badge">private</span>' : ""}
         ${contact}
       </div>
     `;

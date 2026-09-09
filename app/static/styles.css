@@ -119,6 +119,9 @@ button#save, button#scan, button.ghost {
   background: #fff;
 }
 
+/* Ads you can actually write to are the ones worth acting on. */
+.listing.writable { border-left: 3px solid var(--accent); }
+
 .listing h3 { margin: 0 0 6px; font-size: 16px; }
 .listing p { margin: 0 4px 0 0; color: var(--muted); font-size: 14px; }
 

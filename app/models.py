@@ -7,8 +7,7 @@ from typing import Any
 LISTING_TYPES = ("wg", "apartment", "sublet")
 SOURCES = ("wg_gesucht", "kleinanzeigen", "immoscout")
 DEFAULT_EXCLUDE = [
-    "wbs erforderlich",
-    "nur mit wbs",
+    "wbs",
     "wohnberechtigungsschein",
     "tauschwohnung",
     "wohnungstausch",
@@ -86,6 +85,13 @@ class Listing:
     address: str = ""
     district: str = ""
     image_url: str | None = None
+    postcode: str = ""
+    # "wg" = a room in a shared flat, "apartment" = a whole place. Room counts and
+    # square metres mean different things for the two, so filters need to know.
+    listing_kind: str = "apartment"
+    flat_rooms: float | None = None
+    flatmates: int | None = None
+    private_landlord: bool = False
     available_from: str | None = None
     available_to: str | None = None
     duration_months: int | None = None
