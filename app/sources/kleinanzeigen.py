@@ -15,11 +15,38 @@ from app.sources.base import BROWSER_HEADERS, BaseSource
 logger = logging.getLogger(__name__)
 
 BASE = "https://www.kleinanzeigen.de"
-# 203 = Wohnung mieten, 199 = WG-Zimmer
+# 203 = Wohnung mieten, 199 = WG / auf Zeit. Slug must match the live site.
 CATEGORIES = {
-    "apartment": ("wohnungen-mieten", "c203"),
-    "wg": ("wg-zimmer", "c199"),
+    "apartment": ("wohnung-mieten", "c203", "203"),
+    "wg": ("wg-zimmer", "c199", "199"),
 }
+_HOUSING = (
+    "wohnung",
+    "apartment",
+    "appartement",
+    "etagenwohnung",
+    "maisonette",
+    "studio",
+    "zwischenmiete",
+    "untermiete",
+    "wg-zimmer",
+    "wg zimmer",
+    "nachmieter",
+)
+_JUNK = (
+    "zu verschenken",
+    "verkaufe sofa",
+    "verkaufe tisch",
+    "schrankwand",
+    "couch",
+    "ikea",
+    "kommode",
+    "esstisch",
+    "tv board",
+    "tv-board",
+    "regal",
+    "waschmaschine zu verkaufen",
+)
 
 
 class KleinanzeigenSource(BaseSource):
@@ -36,7 +63,7 @@ class KleinanzeigenSource(BaseSource):
         budget = max(8, settings.max_listings_per_source // max(1, len(kinds)))
 
         for kind in kinds:
-            slug, code = CATEGORIES[kind]
+            slug, code, cat_id = CATEGORIES[kind]
             taken = 0
             for page in range(1, settings.max_pages_per_source + 1):
                 url = self._search_url(slug, code, filters, page)
@@ -47,7 +74,7 @@ class KleinanzeigenSource(BaseSource):
                     logger.warning("Kleinanzeigen search failed url=%s: %s", url, exc)
                     break
 
-                page_listings = self._parse(response.text)
+                page_listings = self._parse(response.text, cat_id)
                 if not page_listings:
                     break
                 for listing in page_listings:
@@ -69,23 +96,10 @@ class KleinanzeigenSource(BaseSource):
             path += f"/seite:{page}"
         return BASE + path
 
-    def _parse(self, html: str) -> list[Listing]:
+    def _parse(self, html: str, cat_id: str) -> list[Listing]:
         soup = BeautifulSoup(html, "lxml")
         listings: list[Listing] = []
         articles = soup.select("article[data-adid], li[data-adid], article.aditem")
-        if not articles:
-            # Fallback when markup shifts: split on ad ids.
-            for ad_id in dict.fromkeys(re.findall(r'data-adid="(\d+)"', html)):
-                listings.append(
-                    Listing(
-                        id=f"ka_{ad_id}",
-                        provider="kleinanzeigen",
-                        title=f"Kleinanzeigen {ad_id}",
-                        url=f"{BASE}/s-anzeige/{ad_id}",
-                        contactable=True,
-                    )
-                )
-            return listings
 
         for article in articles:
             ad_id = article.get("data-adid")
@@ -98,6 +112,8 @@ class KleinanzeigenSource(BaseSource):
             href = title_el.get("href") if title_el else ""
             url = href if href.startswith("http") else f"{BASE}{href or f'/s-anzeige/{ad_id}'}"
             text = article.get_text(" ", strip=True)
+            if not _is_housing_ad(url, title, text, cat_id):
+                continue
             price = _parse_price(text)
             rooms = _extract_number(text, r"(\d+(?:[.,]\d+)?)\s*(?:Zimmer|Zi\.?)")
             size = _extract_number(text, r"(\d+(?:[.,]\d+)?)\s*m[²2]")
@@ -128,6 +144,20 @@ class KleinanzeigenSource(BaseSource):
                 )
             )
         return listings
+
+
+def _is_housing_ad(url: str, title: str, text: str, cat_id: str) -> bool:
+    blob = f"{title} {text}".lower()
+    if any(word in blob for word in _JUNK):
+        return False
+    # Kleinanzeigen encode category in the path: /s-anzeige/title/ID-203-LOCATION
+    if re.search(rf"-{cat_id}-\d+", url):
+        return True
+    if any(word in blob for word in _HOUSING):
+        return True
+    if re.search(r"\d+\s*(?:zimmer|zi\.?|m[²2])", blob):
+        return True
+    return False
 
 
 def _parse_price(text: str) -> float | None:
