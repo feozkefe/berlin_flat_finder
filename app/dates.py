@@ -42,6 +42,8 @@ _DATE_RANGE = re.compile(
 # An ad may sit online for a while, and posters write "ab 01.09" in October.
 _MAX_PAST_DAYS = 45
 _MAX_FUTURE_DAYS = 730
+# How far a listing's move-in date may drift from the user's, either way.
+_START_TOLERANCE_DAYS = 14
 
 
 def parse_date(text: str | None) -> date | None:
@@ -225,7 +227,8 @@ def timing_passes(listing: Listing, start_from: str, min_months: int, max_months
     if start_from:
         needed = parse_date(start_from)
         ready = parse_date(listing.available_from)
-        if needed and ready and ready > needed + timedelta(days=14):
+        # A flat free from October is let in October — useless if you move in December.
+        if needed and ready and abs(ready - needed) > timedelta(days=_START_TOLERANCE_DAYS):
             return False
     if min_months and listing.duration_months is not None and listing.duration_months < min_months:
         return False

@@ -19,7 +19,7 @@ from app.dates import parse_user_months, parse_user_start
 from app.districts import DISTRICTS
 from app.models import Filters, Listing
 from app.notify import send_listing_batches, send_scan_result
-from app.scanner import run_scan
+from app.scanner import listing_passes, run_scan
 
 logger = logging.getLogger(__name__)
 
@@ -301,12 +301,13 @@ async def resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def latest(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    filters = db.load_filters()
     rows = db.recent_listings(200)
-    if not rows:
-        await update.message.reply_text("No saved listings yet. /scan")
+    listings = [item for item in map(Listing.from_dict, rows) if listing_passes(item, filters)]
+    if not listings:
+        await update.message.reply_text("No saved listings match your filters. /scan")
         return
-    await update.message.reply_text(f"{len(rows)} saved listings:")
-    listings = [Listing.from_dict(row) for row in rows]
+    await update.message.reply_text(f"{len(listings)} saved listings:")
     await send_listing_batches(context.bot, str(update.effective_chat.id), listings)
 
 

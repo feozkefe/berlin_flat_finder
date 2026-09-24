@@ -17,7 +17,7 @@ from app.config import settings
 from app.districts import public_districts
 from app.models import Filters, Listing
 from app.notify import send_scan_result
-from app.scanner import rank, run_scan
+from app.scanner import listing_passes, rank, run_scan
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -108,7 +108,9 @@ async def post_settings(payload: dict) -> dict:
 @api.get("/api/listings")
 async def listings() -> dict:
     rows = db.recent_listings()
-    ordered = rank([Listing.from_dict(row) for row in rows])
+    filters = db.load_filters()
+    # Saved rows were kept under whatever filters applied at scan time; re-check now.
+    ordered = rank([item for item in map(Listing.from_dict, rows) if listing_passes(item, filters)])
     by_id = {row["id"]: row for row in rows}
     return {"listings": [by_id[item.id] for item in ordered], "scan": db.latest_scan()}
 

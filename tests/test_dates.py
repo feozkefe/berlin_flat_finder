@@ -109,3 +109,12 @@ def test_max_months_drops_unlimited():
     assert timing_passes(listing, "", 0, 6)
     listing.available_from = (date.today() + timedelta(days=40)).strftime("%d.%m.%Y")
     assert not timing_passes(listing, date.today().isoformat(), 0, 0)
+
+
+def test_start_filter_drops_listings_that_start_much_earlier():
+    listing = Listing(id="x", provider="wg_gesucht", title="Zimmer", url="u")
+    wanted = date.today() + timedelta(days=70)
+    listing.available_from = (wanted - timedelta(days=60)).strftime("%d.%m.%Y")
+    assert not timing_passes(listing, wanted.isoformat(), 0, 0)
+    listing.available_from = (wanted - timedelta(days=7)).strftime("%d.%m.%Y")
+    assert timing_passes(listing, wanted.isoformat(), 0, 0)
