@@ -92,7 +92,7 @@ function metaLine(item) {
     : (item.rooms ? `${item.rooms} Zi` : "");
   const timing = [
     item.available_from ? `from ${item.available_from}` : "",
-    item.available_to ? `until ${item.available_to}` : (item.duration_months ? `${item.duration_months} months` : ""),
+    item.available_to ? `until ${item.available_to}` : (item.duration_months ? (item.duration_months < 1 ? "2 weeks" : `${item.duration_months} months`) : ""),
   ].filter(Boolean).join(" · ");
   return [item.district || "Berlin", rooms, item.size_sqm ? `${item.size_sqm} m²` : "", item.price ? `${item.price} €` : "", timing]
     .filter(Boolean)

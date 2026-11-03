@@ -15,7 +15,7 @@ from telegram.ext import (
 
 from app import db
 from app.config import settings
-from app.dates import parse_user_months, parse_user_start
+from app.dates import format_months, parse_user_months, parse_user_start
 from app.districts import DISTRICTS
 from app.models import Filters, Listing
 from app.notify import send_listing_batches, send_scan_result
@@ -66,11 +66,12 @@ def _interval_keyboard(current: int) -> InlineKeyboardMarkup:
 
 
 def _months_label(filters: Filters) -> str:
-    if filters.min_months and filters.max_months:
-        return f"{filters.min_months}-{filters.max_months} months"
-    if filters.min_months:
-        return f"min {filters.min_months} month" + ("s" if filters.min_months != 1 else "")
-    return f"max {filters.max_months} months"
+    low, high = format_months(filters.min_months), format_months(filters.max_months)
+    if low and high:
+        return f"{low} – {high}"
+    if low:
+        return f"min {low}"
+    return f"max {high}"
 
 
 def _bind_chat(filters: Filters, chat_id: int | str) -> Filters:
@@ -175,8 +176,8 @@ async def date_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return DATE_PICK
     context.user_data["filters"]["start_from"] = parsed
     await update.message.reply_text(
-        "How many months? Minimum 1.\n"
-        "e.g. 1  |  6  |  6-12"
+        "How long do you want to stay? In months; 0.5 = 2 weeks.\n"
+        "e.g. 0.5  |  2w  |  1  |  6  |  6-12  |  0.5-3"
     )
     return MONTHS_PICK
 
@@ -184,7 +185,7 @@ async def date_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def months_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     parsed = parse_user_months(update.message.text or "")
     if parsed is None:
-        await update.message.reply_text("Write 1 or 6-12.")
+        await update.message.reply_text("Write 0.5 (2 weeks), 1 or 6-12.")
         return MONTHS_PICK
     context.user_data["filters"]["min_months"] = parsed[0]
     context.user_data["filters"]["max_months"] = parsed[1]

@@ -26,8 +26,9 @@ class Filters:
     sources: list[str] = field(default_factory=lambda: list(SOURCES))
     interval_hours: int = 12
     start_from: str = ""
-    min_months: int = 1
-    max_months: int = 0
+    # 0.5 = a two-week stay; otherwise whole months.
+    min_months: float = 1
+    max_months: float = 0
     telegram_chat_id: str = ""
     exclude_keywords: list[str] = field(default_factory=lambda: list(DEFAULT_EXCLUDE))
     enabled: bool = True
@@ -59,14 +60,12 @@ class Filters:
                 setattr(base, key, data[key])
         if base.interval_hours not in (12, 24):
             base.interval_hours = 12
-        try:
-            base.min_months = int(base.min_months or 0)
-            base.max_months = int(base.max_months or 0)
-        except (TypeError, ValueError):
-            base.min_months = 1
+        from app.dates import normalize_months
+
+        base.min_months = normalize_months(base.min_months, allow_zero=False)
+        base.max_months = normalize_months(base.max_months, allow_zero=True)
+        if base.max_months and base.max_months < base.min_months:
             base.max_months = 0
-        if base.min_months <= 0:
-            base.min_months = 1
         base.start_from = str(base.start_from or "").strip()
         base.listing_types = [t for t in base.listing_types if t in LISTING_TYPES] or list(LISTING_TYPES)
         base.sources = [s for s in base.sources if s in SOURCES] or list(SOURCES)
@@ -94,7 +93,7 @@ class Listing:
     private_landlord: bool = False
     available_from: str | None = None
     available_to: str | None = None
-    duration_months: int | None = None
+    duration_months: float | None = None  # 0.5 = about two weeks
     is_sublet: bool = False
     contactable: bool = True
     alt_urls: list[dict[str, str]] = field(default_factory=list)
