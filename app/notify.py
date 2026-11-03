@@ -5,6 +5,7 @@ import logging
 from telegram import Bot
 
 from app.config import settings
+from app.dates import format_months
 from app.models import Listing, ScanResult
 from app.scanner import rank
 
@@ -49,7 +50,7 @@ def _timing(listing: Listing) -> str | None:
     if listing.available_to:
         bits.append(f"until {listing.available_to}")
     elif listing.duration_months:
-        bits.append(f"{listing.duration_months} months")
+        bits.append(format_months(listing.duration_months))
     return " · ".join(bits) if bits else None
 
 

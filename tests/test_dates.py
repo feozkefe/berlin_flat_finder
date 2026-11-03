@@ -118,3 +118,38 @@ def test_start_filter_drops_listings_that_start_much_earlier():
     assert not timing_passes(listing, wanted.isoformat(), 0, 0)
     listing.available_from = (wanted - timedelta(days=7)).strftime("%d.%m.%Y")
     assert timing_passes(listing, wanted.isoformat(), 0, 0)
+
+
+def test_two_week_minimum_is_accepted():
+    for text in ("0.5", "0,5", "2w", "2 weeks", "2 hafta", "2 Wochen", "yarım", "1/2", "half"):
+        assert parse_user_months(text) == (0.5, 0), text
+    assert parse_user_months("0.5-3") == (0.5, 3)
+    assert parse_user_months("2w-2") == (0.5, 2)
+    assert parse_user_months("6/12") == (6, 12)
+
+
+def test_two_week_filters_survive_a_round_trip():
+    filters = Filters.from_dict({"min_months": 0.5, "max_months": 0})
+    assert filters.min_months == 0.5
+    assert Filters.from_dict({"min_months": "0.5"}).min_months == 0.5
+    assert Filters.from_dict({"min_months": 0}).min_months == 1
+    assert Filters.from_dict({"min_months": 2.0}).min_months == 2
+
+
+def test_short_stays_are_measured_in_half_months():
+    assert months_between(date(2026, 10, 1), date(2026, 10, 15)) == 0.5
+    assert months_between(date(2026, 10, 1), date(2026, 10, 8)) < 0.5
+    assert months_between(date(2026, 10, 1), date(2026, 10, 31)) == 1
+    assert extract_duration_months("Zwischenmiete für 2 Wochen") == 0.5
+    assert extract_duration_months("sublet for 3 weeks") == 0.5
+    assert extract_duration_months("1 Woche frei") < 0.5
+    assert extract_duration_months("8 Wochen Zwischenmiete") == 2
+
+
+def test_two_week_minimum_lets_short_sublets_through():
+    two_weeks = Listing(id="1", provider="wg_gesucht", title="2 Wochen", url="u", duration_months=0.5)
+    one_week = Listing(id="2", provider="wg_gesucht", title="1 Woche", url="u", duration_months=0.23)
+    assert timing_passes(two_weeks, "", 0.5, 0)
+    assert not timing_passes(one_week, "", 0.5, 0)
+    # The default one-month minimum still drops them.
+    assert not timing_passes(two_weeks, "", 1, 0)

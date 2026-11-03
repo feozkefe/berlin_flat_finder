@@ -15,6 +15,8 @@ _MONTHS = re.compile(
     r"(?<![.,\d])(\d{1,2})\s*(?:[-–/]\s*(\d{1,2})\s*)?(?:monat(?:e|en)?|months?|mo\b)(?![a-z])",
     re.I,
 )
+# "2 Wochen", "3 weeks", "2 hafta" — short sublets are quoted in weeks.
+_WEEKS = re.compile(r"(?<![.,\d])(\d{1,2})\s*(?:wochen|woche|weeks?|wks?|hafta)(?![a-z])", re.I)
 # "3 Monatsmieten Kaution", "Kaution 2 Monate" — money, not tenancy length.
 _DEPOSIT_NEAR = re.compile(r"kaution|deposit|monatsmiete|mietsicherheit|bürgschaft|buergschaft", re.I)
 
@@ -141,32 +143,91 @@ def parse_user_start(text: str) -> str:
     return parsed.isoformat() if parsed else "invalid"
 
 
-def parse_user_months(text: str) -> tuple[int, int] | None:
+HALF_MONTH = 0.5  # "2 weeks" — the shortest stay the filters know about.
+
+
+def normalize_months(value: float | int | str | None, *, allow_zero: bool) -> float | int:
+    """Durations are whole months, plus 0.5 for a two-week stay."""
+    try:
+        number = float(str(value).replace(",", ".")) if value not in (None, "") else 0.0
+    except ValueError:
+        number = 0.0
+    if number <= 0:
+        return 0 if allow_zero else 1
+    if number < 1:
+        return HALF_MONTH
+    return int(round(number))
+
+
+def format_months(value: float | int | None) -> str:
+    if not value:
+        return ""
+    if value < 1:
+        return "2 weeks"
+    count = int(value)
+    return f"{count} month" + ("s" if count != 1 else "")
+
+
+_HALF_WORDS = {"half", "yarım", "yarim", "0.5", "0,5", ".5", "1/2", "½", "2w", "2wk", "2wks"}
+
+
+def _user_months_token(token: str) -> float | None:
+    """One side of '6-12': '6', '0.5', '2w', '2weeks', '2hafta', 'yarım'."""
+    if token in _HALF_WORDS:
+        return HALF_MONTH
+    weeks = re.fullmatch(r"(\d{1,2})(?:w|wk|wks|week|weeks|hafta|woche|wochen)", token)
+    if weeks:
+        count = int(weeks.group(1))
+        if count <= 0:
+            return None
+        return HALF_MONTH if count < 4 else float(max(1, round(count / 4.345)))
+    number = re.fullmatch(r"(\d{1,2})(?:[.,](\d))?", token)
+    if not number:
+        return None
+    return float(f"{number.group(1)}.{number.group(2) or 0}")
+
+
+def parse_user_months(text: str) -> tuple[float | int, float | int] | None:
     raw = (text or "").strip().lower()
     raw = re.sub(r"\b(min|max|at least|en az|ay|month|months|monat|monate|monaten)\b", "", raw)
     raw = raw.replace(" ", "")
     if raw in _ANY or raw == "":
         return (1, 0)
-    match = re.fullmatch(r"(\d{1,2})(?:[-/](\d{1,2}))?", raw)
-    if not match:
+    if raw in _HALF_WORDS:
+        # "1/2" means half a month here, not a 1-2 month range.
+        return (HALF_MONTH, 0)
+    parts = re.split(r"[-–]|/(?!2$)", raw, maxsplit=1)
+    low_raw = _user_months_token(parts[0])
+    high_raw = _user_months_token(parts[1]) if len(parts) > 1 else 0.0
+    if low_raw is None or high_raw is None:
         return None
-    low = max(1, int(match.group(1)))
-    high = int(match.group(2)) if match.group(2) else 0
-    if low > 36 or high > 36:
+    if low_raw > 36 or high_raw > 36:
         return None
+    low = normalize_months(low_raw, allow_zero=False)
+    high = normalize_months(high_raw, allow_zero=True)
     if high and high < low:
         return None
     return (low, high)
 
 
-def months_between(start: date, end: date) -> int:
-    """Rounded to whole months: 01.10.-30.11. is two months, not one."""
+def months_between(start: date, end: date) -> float | int:
+    """Rounded to whole months: 01.10.-30.11. is two months, not one.
+
+    Stays under a month count as 0.5 (about two weeks) when they last at least
+    12 days, and as their real fraction otherwise, so a one-week sublet stays
+    below a two-week minimum.
+    """
     if end <= start:
         return 0
-    return max(1, round((end - start).days / 30.44))
+    days = (end - start).days
+    if days >= 23:
+        return max(1, round(days / 30.44))
+    if days >= 12:
+        return HALF_MONTH
+    return round(days / 30.44, 2)
 
 
-def extract_duration_months(text: str) -> int | None:
+def extract_duration_months(text: str) -> float | int | None:
     """Tenancy length in months, ignoring deposit amounts quoted in months."""
     for match in _MONTHS.finditer(text or ""):
         window = text[max(0, match.start() - 40) : match.end() + 40]
@@ -176,6 +237,13 @@ def extract_duration_months(text: str) -> int | None:
         if not 1 <= low <= 36:
             continue
         return low
+    for match in _WEEKS.finditer(text or ""):
+        weeks = int(match.group(1))
+        if not 1 <= weeks <= 52:
+            continue
+        if weeks >= 4:
+            return max(1, round(weeks / 4.345))
+        return HALF_MONTH if weeks >= 2 else round(weeks * 7 / 30.44, 2)
     return None
 
 
@@ -223,7 +291,7 @@ def fill_timing(listing: Listing, extra_text: str = "") -> Listing:
     return listing
 
 
-def timing_passes(listing: Listing, start_from: str, min_months: int, max_months: int) -> bool:
+def timing_passes(listing: Listing, start_from: str, min_months: float, max_months: float) -> bool:
     if start_from:
         needed = parse_date(start_from)
         ready = parse_date(listing.available_from)

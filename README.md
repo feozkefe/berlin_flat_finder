@@ -48,7 +48,7 @@ Both paths write the same settings.
 2. Max warm rent, e.g. `1100`
 3. Min rooms, e.g. `2` — whole apartments only; a WG ad is one room by definition
 4. Available from, e.g. `01.10.2026` (or `0` for anytime)
-5. Duration in months, e.g. `1`, `6`, `6-12`
+5. Duration in months, e.g. `0.5` (= 2 weeks, also `2w` / `2 hafta`), `1`, `6`, `6-12`, `0.5-3`
 6. Type: WG room / apartment / sublet → Continue
 7. **12 hours** or **24 hours**
 
